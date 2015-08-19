@@ -152,12 +152,26 @@ namespace DbMigrator.Core.DataAccess
                 startSub = goPositions[i] + (i > 0 ? 2 : 0);
                 subLength = goPositions[i + 1] - startSub;
                 var command = query.Substring(startSub, subLength);
-                commands.Add(command);
+                command = TrimSqlQuery(command);
+                if(!string.IsNullOrWhiteSpace(command))
+                    commands.Add(command);
             }
 
 
 
             return commands.ToArray();
+        }
+
+        /// <summary>
+        /// Remove conteúdo indesejado do início e no fim da query.
+        /// </summary>
+        private string TrimSqlQuery(string query)
+        {
+            if (query != null)
+            {
+                query = new Regex("(^GO|GO$)", RegexOptions.Multiline | RegexOptions.IgnoreCase).Replace(query.Trim(), "").Trim();
+            }
+            return query;
         }
 
         #endregion

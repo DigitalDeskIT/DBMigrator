@@ -36,7 +36,9 @@ namespace DbMigrator.ConsoleApp
 
         public void Info(string info)
         {
+            Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine(string.Concat(tab, info));
+            Console.ResetColor();
         }
 
         private string dynamicLoadingString = "|--------------------|";

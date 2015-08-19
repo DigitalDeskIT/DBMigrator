@@ -9,6 +9,8 @@ namespace DbMigrator.ConsoleApp
 {
     class Program
     {
+        static ConsoleOutputHandler output = new ConsoleOutputHandler();
+
         static void Main(string[] args)
         {
             var opts = new Options();
@@ -22,7 +24,12 @@ namespace DbMigrator.ConsoleApp
                     new Core.JsonMigrationMapProvider(opts.ScriptsMapPath, opts.ScriptsRootPath)
                 );
 
-                runner.SetOutputHandler(new ConsoleOutputHandler());
+                if (opts.Dynamic > 0)
+                {
+                    SetupDynamicRunner(runner, opts.Dynamic);
+                }
+
+                runner.SetOutputHandler(output);
 
                 runner.AddFilter(new Core.MigrationFilter.RootMigrationFilter());
 
@@ -51,6 +58,63 @@ namespace DbMigrator.ConsoleApp
 #if DEBUG
             Console.ReadKey();
 #endif
+        }
+
+        private static TEnum? TryReadEnum<TEnum>() where TEnum:struct
+        {
+            TEnum parsedEnum;
+            Type enumType = typeof(TEnum);
+            string opts = string.Join(", ", Enum.GetNames(enumType));
+            output.Info(opts + "?");
+            string input = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return default(TEnum);
+            }
+            Enum.TryParse<TEnum>(input, true, out parsedEnum);
+            return parsedEnum;
+        }
+
+        private static void SetupDynamicRunner(Core.MigrationRunner runner, int dynamicLevel)
+        {
+            if (dynamicLevel > 0)
+            {
+                runner.SetOnCompletingTransaction((context) =>
+                {
+                    output.Info("You are about to complete the migration process. What would you like to do?");
+                    DbMigrator.Core.OnCompletingTransactionDecision? decision = null;
+                    while (decision == null)
+                    {
+                        decision = TryReadEnum<DbMigrator.Core.OnCompletingTransactionDecision>();
+                    }
+                    context.Decision = decision.Value;
+                });
+            }
+            if (dynamicLevel > 1)
+            {
+                runner.SetOnMigrating((context) =>
+                {
+                    output.Info(string.Format("Migration {0}", context.Migration.Identifier));
+
+                    DbMigrator.Core.OnMigratingDecision? decision = null;
+                    while (decision == null)
+                    {
+                        decision = TryReadEnum<DbMigrator.Core.OnMigratingDecision>();
+                    }
+                    context.Decision = decision.Value;
+                });
+
+                runner.SetOnMigrationError((context) =>
+                {
+                    output.Info("An error has ocurred. What would you like to do?");
+                    DbMigrator.Core.OnMigrationErrorDecision? decision = null;
+                    while (decision == null)
+                    {
+                        decision = TryReadEnum<DbMigrator.Core.OnMigrationErrorDecision>();
+                    }
+                    context.Decision = decision.Value;
+                });
+            }
         }
     }
 
