@@ -49,26 +49,43 @@ namespace DbMigrator.Core
             output.EventBegin("migration", "Migration");
 
             //upgrade the schema to be updated
+            output.Info("Checking Core Schema");
             dataProvider.UpgradeSchema();
+            
 
             //get nodes
+            output.EventBegin("map-load","Migration Map Load");
             var map = mapProvider.GetMigrationMap();
+            var allMigrationsCount = map.MigrationNodes.SelectMany(x => x.Migrations).Count();
+            output.Info(string.Format("{0} migrations found.", allMigrationsCount));
+            output.EventEnd("map-load", "Migration Map Load");
 
             //get nodes current state in the selected database
+            output.Info("Checking Migration Map State");
             var databaseMigrationState = GetState(map);
 
             //filter nodes
             MigrationFilterContext filterContext = new MigrationFilterContext() { MigrationNodes = databaseMigrationState.MigrationNodesInfo };
+            output.EventBegin("filtering", "Filtering Nodes");
             foreach (var migrationFilter in migrationFilters)
             {
+                output.Info("Filtering Nodes with filter "+ migrationFilter.GetType().Name);
                 migrationFilter.Filter(filterContext);
             }
+            output.EventEnd("filtering", "Filtering Nodes");
+
+            output.EventBegin("transaction", "Transaction");
+            var migrationsToExecuteCount = databaseMigrationState.MigrationNodesInfo.SelectMany(x => x.MigrationsInfo).Where(x => x.CurrentState == Migration.MigrationState.ToUpgrade).Count();
+            output.Info(string.Format("{0} migrations to execute.", migrationsToExecuteCount));
 
             using (var transactionScope = new TransactionScope(TransactionScopeOption.Required, TimeSpan.MaxValue))
             {
                 //migrate
                 bool stopNodeProcessing = false;
                 bool hasErrors = false;
+
+                int migratedNodes = 0;
+                int markedNodes = 0;
 
                 foreach (var nodeInfo in databaseMigrationState.MigrationNodesInfo)
                 {
@@ -78,6 +95,9 @@ namespace DbMigrator.Core
                     var node = nodeInfo.MigrationNode;
                     foreach (var migrationInfo in nodeInfo.MigrationsInfo)
                     {
+                        if (stopNodeProcessing)
+                            break;
+
                         if (migrationInfo.CurrentState == Migration.MigrationState.ToUpgrade)
                         {
                             bool jumpCurrentExecution = false;
@@ -104,7 +124,9 @@ namespace DbMigrator.Core
                             {
                                 try
                                 {
+                                    output.Info("Executing script " +migration.Identifier);
                                     dataProvider.ExecuteSql(sql);
+                                    migratedNodes++;
                                 }
                                 catch (Exception ex)
                                 {
@@ -131,26 +153,37 @@ namespace DbMigrator.Core
                                     MigrationNodeId = node.Identifier,
                                     MigrationRunnerId = this.identifier
                                 });
+                                markedNodes++;
                             }
                         }
                     }
                 }
-                if (completeTransaction)
+                if (migratedNodes == 0 && markedNodes == 0)
                 {
-                    var onCompletingTransactionContext = new OnCompletingTransactionContext() { HasErrors = hasErrors };
-                    onCompletingTransaction(onCompletingTransactionContext);
-                    switch (onCompletingTransactionContext.Decision)
-                    {
-                        case OnCompletingTransactionDecision.Commit: { transactionScope.Complete(); break; }
-                        case OnCompletingTransactionDecision.Rollback: { transactionScope.Dispose(); break; }
-                        default: { throw new NotImplementedException(); }
-                    }
+                    transactionScope.Dispose();
+                    output.Info("Nothing to commit or rollback.");
                 }
                 else
                 {
-                    transactionScope.Dispose();
+                    if (completeTransaction)
+                    {
+                        var onCompletingTransactionContext = new OnCompletingTransactionContext() { HasErrors = hasErrors };
+                        onCompletingTransaction(onCompletingTransactionContext);
+                        switch (onCompletingTransactionContext.Decision)
+                        {
+                            case OnCompletingTransactionDecision.Commit: { output.Info("Commiting..."); transactionScope.Complete(); break; }
+                            case OnCompletingTransactionDecision.Rollback: { output.Info("Rolling back..."); transactionScope.Dispose(); break; }
+                            default: { throw new NotImplementedException(); }
+                        }
+                    }
+                    else
+                    {
+                        output.Info("Rolling back...");
+                        transactionScope.Dispose();
+                    }
                 }
             }
+            output.EventEnd("transaction", "Transaction");
 
             output.EventEnd("migration", "Migration");
         }       

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DbMigrator.ConsoleApp
@@ -62,17 +63,31 @@ namespace DbMigrator.ConsoleApp
 
         private static TEnum? TryReadEnum<TEnum>() where TEnum:struct
         {
+            
             TEnum parsedEnum;
             Type enumType = typeof(TEnum);
-            string opts = string.Join(", ", Enum.GetNames(enumType));
+            var optsArr = Enum.GetNames(enumType).Select(x => string.Format("[{0}]{1}", (int)Enum.Parse(enumType, x), x)).ToArray();
+            string opts = string.Join(", ", optsArr);
+            
+            Console.ForegroundColor = ConsoleColor.Yellow;
             output.Info(opts + "?");
+            Console.ResetColor();
             string input = Console.ReadLine();
             if (string.IsNullOrWhiteSpace(input))
             {
                 return default(TEnum);
             }
-            Enum.TryParse<TEnum>(input, true, out parsedEnum);
-            return parsedEnum;
+            Regex isNumber = new Regex("^[0-9]+$");
+            if (isNumber.IsMatch(input))
+            {
+                return (TEnum)(object)Int32.Parse(input);
+            }
+            else
+            {
+                if (!Enum.TryParse<TEnum>(input, true, out parsedEnum))
+                    return null;
+                return parsedEnum;
+            }
         }
 
         private static void SetupDynamicRunner(Core.MigrationRunner runner, int dynamicLevel)
@@ -94,7 +109,7 @@ namespace DbMigrator.ConsoleApp
             {
                 runner.SetOnMigrating((context) =>
                 {
-                    output.Info(string.Format("Migration {0}", context.Migration.Identifier));
+                    output.Info(string.Format("Current Migration: {0}", context.Migration.Identifier));
 
                     DbMigrator.Core.OnMigratingDecision? decision = null;
                     while (decision == null)
@@ -144,16 +159,16 @@ namespace DbMigrator.ConsoleApp
         [Option("trimExpression", Required = false, DefaultValue = "", HelpText = "An expression to trim the migrations files.")]
         public string TrimExpression { get; set; }
 
-        [HelpVerbOption]
-        public string GetUsage()
-        {
-            return CommandLine.Text.HelpText.AutoBuild(this);
-        }
-
         [Option("firstNode", Required = false, DefaultValue = "", HelpText = "The first node to consider in the map. All previous nodes will be ignored.")]
         public string LastNode { get; set; }
 
         [Option("lastNode", Required = false, DefaultValue = "", HelpText = "The last node to consider in the map. All next nodes will be ignored.")]
         public string FirstNode { get; set; }
+
+        [HelpVerbOption]
+        public string GetUsage()
+        {
+            return CommandLine.Text.HelpText.AutoBuild(this);
+        }
     }
 }

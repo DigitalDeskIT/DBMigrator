@@ -26,7 +26,7 @@ namespace DbMigrator.Core.DataAccess
         #region string util
 
         /// <summary>
-        /// Transforma um bloco de sql em diversos blocos executáveis para serem alocados em uma transação.
+        /// Transform an sql block in many commands to be allocated in a transaction.
         /// </summary>
         private string[] SplitSqlCommandsComplex(string query)
         {
@@ -163,7 +163,7 @@ namespace DbMigrator.Core.DataAccess
         }
 
         /// <summary>
-        /// Remove conteúdo indesejado do início e no fim da query.
+        /// Remove unnecessary content from the beginning and the end of a sql query.
         /// </summary>
         private string TrimSqlQuery(string query)
         {
