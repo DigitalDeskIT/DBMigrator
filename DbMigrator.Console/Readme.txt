@@ -1,0 +1,1 @@
+﻿--mode test --dynamic 0 --identifier CaixaDigital --verbose 1 --scriptsMapPath "D:\Projetos\IssueCenter\DotNet\GitRepo\db-migrate\config.json" --scriptsRootPath "D:\Projetos\IssueCenter\DbMigrateScripts" --connectionString "server=localhost\SQLEXPRESS; database=IssueCenterLocalTemp; Trusted_Connection=True;" --trimExpression "" 
