@@ -66,18 +66,25 @@ namespace DbMigrator.Core
 
             //filter nodes
             MigrationFilterContext filterContext = new MigrationFilterContext() { MigrationNodes = databaseMigrationState.MigrationNodesInfo };
-            output.EventBegin("filtering", "Filtering Nodes");
+            output.EventBegin("filtering", "Node Filtering");
             foreach (var migrationFilter in migrationFilters)
             {
                 output.Info("Filtering Nodes with filter "+ migrationFilter.GetType().Name);
                 migrationFilter.Filter(filterContext);
             }
-            output.EventEnd("filtering", "Filtering Nodes");
+            output.EventEnd("filtering", "Node Filtering");
+
+            var migrationsToExecuteCount = databaseMigrationState.MigrationNodesInfo.SelectMany(x => x.MigrationsInfo).Where(x => x.CurrentState == Migration.MigrationState.ToUpgrade).Count();
+            output.EventBegin("summary", "Migration Plan", migrationsToExecuteCount + " migrations.");
+            foreach (var migration in databaseMigrationState.MigrationNodesInfo.SelectMany(x => x.MigrationsInfo))
+            {
+                output.Info(string.Format(" - {0}", migration.Migration.Identifier));
+            }
+            output.EventEnd("summary", "Migration Plan");
 
             output.EventBegin("transaction", "Transaction");
-            var migrationsToExecuteCount = databaseMigrationState.MigrationNodesInfo.SelectMany(x => x.MigrationsInfo).Where(x => x.CurrentState == Migration.MigrationState.ToUpgrade).Count();
-            output.Info(string.Format("{0} migrations to execute.", migrationsToExecuteCount));
 
+            bool transactionCommited = false;
             using (var transactionScope = new TransactionScope(TransactionScopeOption.Required, TimeSpan.MaxValue))
             {
                 //migrate
@@ -110,9 +117,9 @@ namespace DbMigrator.Core
                             onMigrating(migratingContext);
                             switch (migratingContext.Decision)
                             {
-                                case OnMigratingDecision.Continue: { break; }
+                                case OnMigratingDecision.Run: { break; }
                                 case OnMigratingDecision.Stop: { stopNodeProcessing = true; jumpCurrentExecution = true; markExecution = false; break; }
-                                case OnMigratingDecision.Jump: { jumpCurrentExecution = true; markExecution = true; break; }
+                                case OnMigratingDecision.Jump: { jumpCurrentExecution = true; markExecution = false; break; }
                                 case OnMigratingDecision.JumpAndMark: { jumpCurrentExecution = true; markExecution = true; break; }
                                 default: { throw new NotImplementedException(); }
                             }
@@ -171,7 +178,13 @@ namespace DbMigrator.Core
                         onCompletingTransaction(onCompletingTransactionContext);
                         switch (onCompletingTransactionContext.Decision)
                         {
-                            case OnCompletingTransactionDecision.Commit: { output.Info("Commiting..."); transactionScope.Complete(); break; }
+                            case OnCompletingTransactionDecision.Commit: {
+                                output.Info("Commiting...");
+                                transactionScope.Complete();
+                                transactionCommited = true;
+                                //set resolved root
+                                break;
+                            }
                             case OnCompletingTransactionDecision.Rollback: { output.Info("Rolling back..."); transactionScope.Dispose(); break; }
                             default: { throw new NotImplementedException(); }
                         }
@@ -185,8 +198,14 @@ namespace DbMigrator.Core
             }
             output.EventEnd("transaction", "Transaction");
 
+            foreach (var migrationFilter in migrationFilters)
+            {
+                migrationFilter.AfterTransaction(transactionCommited);
+            }
+
+
             output.EventEnd("migration", "Migration");
-        }       
+        }
 
         public MigrationMapStateInfo GetState(MigrationMap migrationMap)
         {

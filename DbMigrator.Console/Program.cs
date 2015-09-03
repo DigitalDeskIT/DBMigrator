@@ -25,14 +25,13 @@ namespace DbMigrator.ConsoleApp
                     new Core.JsonMigrationMapProvider(opts.ScriptsMapPath, opts.ScriptsRootPath)
                 );
 
-                if (opts.Dynamic > 0)
-                {
-                    SetupDynamicRunner(runner, opts.Dynamic);
-                }
+                if (opts.Interactive > 0)
+                    SetupDynamicRunner(runner, opts.Interactive);
+                
 
                 runner.SetOutputHandler(output);
 
-                runner.AddFilter(new Core.MigrationFilter.RootMigrationFilter());
+                runner.AddFilter(new Core.MigrationFilter.RootMigrationFilter(dataProvider, opts.Identifier));
 
                 if(!string.IsNullOrWhiteSpace(opts.TrimExpression))
                     runner.AddFilter(new Core.MigrationFilter.FlagMigrationFilter(new Core.Util.FlagFilter(opts.TrimExpression)));
@@ -138,8 +137,8 @@ namespace DbMigrator.ConsoleApp
         [Option("mode", Required = false, HelpText = "Migrate or Test.", DefaultValue="test")]
         public string Mode { get; set; }
 
-        [Option("dynamic", Required = false, DefaultValue=0, HelpText = "If the console should ask questions during the process. 0=Never, 1=CommitTransactionOnly, 2=EveryStep")]
-        public int Dynamic { get; set; }
+        [Option("interactive", Required = false, DefaultValue=0, HelpText = "If the console should ask questions during the process. 0=Never, 1=CommitTransactionOnly, 2=EveryStep")]
+        public int Interactive { get; set; }
 
         [Option("identifier", Required = true, HelpText = "The migration runner identifier.")]
         public string Identifier { get; set; }

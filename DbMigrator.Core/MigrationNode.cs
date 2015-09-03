@@ -17,5 +17,12 @@ namespace DbMigrator.Core
             get;
             set;
         }
+
+
+        public bool Root
+        {
+            get;
+            set;
+        }
     }
 }

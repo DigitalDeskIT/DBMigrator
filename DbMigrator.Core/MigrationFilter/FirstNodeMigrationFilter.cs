@@ -18,5 +18,9 @@ namespace DbMigrator.Core.MigrationFilter
         {
          
         }
+
+        public void AfterTransaction(bool commited)
+        {
+        }
     }
 }

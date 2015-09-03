@@ -10,6 +10,7 @@ namespace DbMigrator.Core
     public interface IMigrationNode
     {
         string Identifier { get; }
+        bool Root { get; }
         List<IMigration> Migrations { get; set; }
     }
 }

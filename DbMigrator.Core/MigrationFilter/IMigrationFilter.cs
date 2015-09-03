@@ -9,5 +9,7 @@ namespace DbMigrator.Core
     public interface IMigrationFilter
     {
         void Filter(MigrationFilterContext migrationFilterContext);
+
+        void AfterTransaction(bool commited);
     }
 }

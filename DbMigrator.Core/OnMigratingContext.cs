@@ -14,7 +14,7 @@ namespace DbMigrator.Core
 
     public enum OnMigratingDecision
     {
-        Continue, //default
+        Run, //default
         Jump,
         JumpAndMark,
         Stop

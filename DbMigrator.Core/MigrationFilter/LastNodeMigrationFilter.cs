@@ -8,15 +8,20 @@ namespace DbMigrator.Core.MigrationFilter
 {
     public class LastNodeMigrationFilter : IMigrationFilter
     {
-        private string p;
+        private string nodeName;
 
         public LastNodeMigrationFilter(string nodeName)
         {
-            this.p = nodeName;
+            this.nodeName = nodeName;
         }
+
         public void Filter(MigrationFilterContext migrationFilterContext)
         {
             
+        }
+
+        public void AfterTransaction(bool commited)
+        {
         }
     }
 }

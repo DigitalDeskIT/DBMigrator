@@ -36,5 +36,10 @@ namespace DbMigrator.Core.MigrationFilter
                 node.MigrationsInfo = node.MigrationsInfo.Where(x => !exceptMigrations.Contains(x.Migration)).ToList();
             }
         }
+
+
+        public void AfterTransaction(bool commited)
+        {
+        }
     }
 }
