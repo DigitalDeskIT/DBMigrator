@@ -1,9 +1,9 @@
-/DbMigrator.Console/bin
-/DbMigrator.Console/obj
-/DbMigrator.Core/bin
-/DbMigrator.Core/obj
-/DbMigrator.Core.Test/bin
-/DbMigrator.Core.Test/obj
+sln/DbMigrator.Console/bin
+sln/DbMigrator.Console/obj
+sln/DbMigrator.Core/bin
+sln/DbMigrator.Core/obj
+sln/DbMigrator.Core.Test/bin
+sln/DbMigrator.Core.Test/obj
 *.suo
 *.user
-/packages
+sln/packages
