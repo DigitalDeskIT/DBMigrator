@@ -10,19 +10,19 @@ namespace DbMigrator.Core
 {
     public class MigrationRunner
     {
-        private readonly string identifier;
+        private string identifier;
         private readonly IDataProvider dataProvider;
         private readonly IMigrationMapProvider mapProvider;
         private IMigrationRunnerOutputHandler output = new SilentMigratorRunnerOutputHandler();
 
         public MigrationRunner(
-            string identifier,
             IDataProvider dataProvider,
-            IMigrationMapProvider mapProvider
+            IMigrationMapProvider mapProvider,
+            string identifier = null
         ){
-            this.identifier = identifier;
             this.dataProvider = dataProvider;
             this.mapProvider = mapProvider;
+            this.identifier = identifier;
         }
 
         public void SetOutputHandler(IMigrationRunnerOutputHandler outputHandler)
@@ -44,7 +44,7 @@ namespace DbMigrator.Core
         public void SetOnMigrationError(Action<OnMigrationErrorContext> action) { this.onMigrationError = action; }
         public void SetOnCompletingTransaction(Action<OnCompletingTransactionContext> action) { this.onCompletingTransaction = action; }
 
-        public void Migrate(bool completeTransaction)
+        public void Migrate()
         {
             output.EventBegin("migration", "Migration");
 
@@ -56,6 +56,11 @@ namespace DbMigrator.Core
             //get nodes
             output.EventBegin("map-load","Migration Map Load");
             var map = mapProvider.GetMigrationMap();
+            if (map.Identifier != null)
+                this.identifier = map.Identifier;
+            if (this.identifier == null)
+                throw new InvalidOperationException("Could not define a valid identifier for the migrator.");
+
             var allMigrationsCount = map.MigrationNodes.SelectMany(x => x.Migrations).Count();
             output.Info(string.Format("{0} migrations found.", allMigrationsCount));
             output.EventEnd("map-load", "Migration Map Load");
@@ -76,7 +81,7 @@ namespace DbMigrator.Core
 
             var migrationsToExecuteCount = databaseMigrationState.MigrationNodesInfo.SelectMany(x => x.MigrationsInfo).Where(x => x.CurrentState == Migration.MigrationState.ToUpgrade).Count();
             output.EventBegin("summary", "Migration Plan", migrationsToExecuteCount + " migrations.");
-            foreach (var migration in databaseMigrationState.MigrationNodesInfo.SelectMany(x => x.MigrationsInfo))
+            foreach (var migration in databaseMigrationState.MigrationNodesInfo.SelectMany(x => x.MigrationsInfo).Where(x => x.CurrentState == Migration.MigrationState.ToUpgrade))
             {
                 output.Info(string.Format(" - {0}", migration.Migration.Identifier));
             }
@@ -85,8 +90,8 @@ namespace DbMigrator.Core
             output.EventBegin("transaction", "Transaction");
 
             bool transactionCommited = false;
-            using (var transactionScope = new TransactionScope(TransactionScopeOption.Required, TimeSpan.MaxValue))
-            {
+            using (var transactionScope = new TransactionScope()
+            ){
                 //migrate
                 bool stopNodeProcessing = false;
                 bool hasErrors = false;
@@ -142,7 +147,8 @@ namespace DbMigrator.Core
                                     onMigrationError(migrationErrorContext);
                                     switch (migrationErrorContext.Decision)
                                     {
-                                        case OnMigrationErrorDecision.Stop: { stopNodeProcessing = true; break; }
+                                        case OnMigrationErrorDecision.Stop: { stopNodeProcessing = true; markExecution = false; break; }
+                                        case OnMigrationErrorDecision.MarkAnywayAndStop: { stopNodeProcessing = true; break; }
                                         case OnMigrationErrorDecision.Continue: { markExecution = false; break; }
                                         case OnMigrationErrorDecision.MarkAnywayAndContinue: { markExecution = true; break; }
                                         default: { throw new NotImplementedException(); }
@@ -167,32 +173,26 @@ namespace DbMigrator.Core
                 }
                 if (migratedNodes == 0 && markedNodes == 0)
                 {
-                    transactionScope.Dispose();
                     output.Info("Nothing to commit or rollback.");
                 }
                 else
                 {
-                    if (completeTransaction)
+                    var onCompletingTransactionContext = new OnCompletingTransactionContext() { HasErrors = hasErrors };
+                    onCompletingTransaction(onCompletingTransactionContext);
+                    switch (onCompletingTransactionContext.Decision)
                     {
-                        var onCompletingTransactionContext = new OnCompletingTransactionContext() { HasErrors = hasErrors };
-                        onCompletingTransaction(onCompletingTransactionContext);
-                        switch (onCompletingTransactionContext.Decision)
-                        {
-                            case OnCompletingTransactionDecision.Commit: {
-                                output.Info("Commiting...");
-                                transactionScope.Complete();
-                                transactionCommited = true;
-                                //set resolved root
-                                break;
-                            }
-                            case OnCompletingTransactionDecision.Rollback: { output.Info("Rolling back..."); transactionScope.Dispose(); break; }
-                            default: { throw new NotImplementedException(); }
+                        case OnCompletingTransactionDecision.Commit: {
+                            output.Info("Commiting...");
+                            transactionScope.Complete();
+                            transactionCommited = true;
+                            //set resolved root
+                            break;
                         }
-                    }
-                    else
-                    {
-                        output.Info("Rolling back...");
-                        transactionScope.Dispose();
+                        case OnCompletingTransactionDecision.Rollback: {
+                            output.Info("Rolling back...");
+                            break;
+                        }
+                        default: { throw new NotImplementedException(); }
                     }
                 }
             }

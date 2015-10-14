@@ -16,6 +16,7 @@ namespace DbMigrator.Core
     public enum OnMigrationErrorDecision
     {
         Stop, //default
+        MarkAnywayAndStop,
         MarkAnywayAndContinue,
         Continue
     }

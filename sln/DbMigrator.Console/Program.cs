@@ -1,6 +1,7 @@
 ﻿using CommandLine;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -12,52 +13,153 @@ namespace DbMigrator.ConsoleApp
     {
         static ConsoleOutputHandler output = new ConsoleOutputHandler();
 
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
-            var opts = new Options();
-            if (CommandLine.Parser.Default.ParseArguments(args, opts))
+            try
             {
-                var dataProvider = new Core.DataAccess.MSSqlDataProvider(opts.ConnectionString);
+                string invokedVerb = "";
+                object invokedVerbInstance = null;
 
-                Core.MigrationRunner runner = new Core.MigrationRunner(
-                    opts.Identifier,
-                    dataProvider,
-                    new Core.JsonMigrationMapProvider(opts.ScriptsMapPath, opts.ScriptsRootPath)
-                );
+                var options = new Options();
 
-                if (opts.Interactive > 0)
-                    SetupDynamicRunner(runner, opts.Interactive);
-                
+                try
+                {
+                    CommandLine.Parser.Default.ParseArguments(args, options, (verb, subOptions) =>
+                    {
+                        invokedVerb = verb;
+                        invokedVerbInstance = subOptions;
+                    });
+                }
+                catch (NullReferenceException)
+                {
+                    Console.WriteLine("Accepted verbs: migrate, trim.");
+                    return -1;
+                }
 
-                runner.SetOutputHandler(output);
+                if (!string.IsNullOrWhiteSpace(invokedVerb))
+                {
+                    invokedVerb = invokedVerb.ToLowerInvariant();
 
-                runner.AddFilter(new Core.MigrationFilter.RootMigrationFilter(dataProvider, opts.Identifier));
-
-                if(!string.IsNullOrWhiteSpace(opts.TrimExpression))
-                    runner.AddFilter(new Core.MigrationFilter.FlagMigrationFilter(new Core.Util.FlagFilter(opts.TrimExpression)));
-
-                if (!string.IsNullOrWhiteSpace(opts.FirstNode))
-                    runner.AddFilter(new Core.MigrationFilter.FirstNodeMigrationFilter(opts.FirstNode));
-
-                if (!string.IsNullOrWhiteSpace(opts.LastNode))
-                    runner.AddFilter(new Core.MigrationFilter.LastNodeMigrationFilter(opts.LastNode));
-
-                if(opts.Mode=="migrate")
-                    runner.Migrate(true);
-                else if (opts.Mode == "test")
-                    runner.Migrate(false);                
-                else
-                    Console.WriteLine("Invalid mode.");
-                
+                    if (invokedVerb == "migrate")
+                    {
+                        if (invokedVerbInstance == null)
+                        {
+                            Console.WriteLine(new MigrateOptions().GetUsage());
+                        }
+                        else
+                        {
+                            Migrate((MigrateOptions)invokedVerbInstance);
+                            return 0;
+                        }
+                    }
+                    else if (invokedVerb == "trim")
+                    {
+                        if (invokedVerbInstance == null)
+                        {
+                            Console.WriteLine(new TrimOptions().GetUsage());
+                        }
+                        else
+                        {
+                            Trim((TrimOptions)invokedVerbInstance);
+                            return 0;
+                        }
+                    }
+                    else
+                    {
+                        throw new NotImplementedException("Verb not implemented.");
+                    }
+                }
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine(opts.GetUsage());
+                Console.WriteLine(ex.ToString());
+#if DEBUG
+                Console.ReadKey();
+#endif
             }
-
 #if DEBUG
             Console.ReadKey();
 #endif
+            return -1;
+        }
+
+        private static void Trim(TrimOptions trimOptions)
+        {
+            new FolderTrimmer().TrimFolder(trimOptions.Folder, trimOptions.Filter);
+        }
+
+        private static void Migrate(MigrateOptions opts)
+        {
+            var dataProvider = new Core.DataAccess.MSSqlDataProvider(opts.ConnectionString);
+
+            if (string.IsNullOrWhiteSpace(opts.ScriptsRootPath))
+                opts.ScriptsRootPath = new FileInfo(opts.ScriptsMapPath).Directory.ToString();
+
+            Core.MigrationRunner runner = new Core.MigrationRunner(
+                dataProvider,
+                new Core.JsonMigrationMapProvider(opts.ScriptsMapPath, opts.ScriptsRootPath),
+                opts.Identifier
+            );
+
+            if (opts.Mode != null)
+                opts.Mode = opts.Mode.ToLowerInvariant().Trim();
+            if (opts.Mode == "migrate")
+            {
+                SetupMigrateRunner(runner);
+            }
+            else if (opts.Mode == "test")
+            {
+                SetupTestRunner(runner);
+            }
+            else if (opts.Mode == "interactive")
+            {
+                SetupDynamicRunner(runner);
+            }
+            else
+            {
+                throw new ArgumentException("Invalid migration mode.");
+            }
+
+            runner.SetOutputHandler(output);
+
+            runner.AddFilter(new Core.MigrationFilter.RootMigrationFilter(dataProvider, opts.Identifier));
+
+            if (!string.IsNullOrWhiteSpace(opts.TrimExpression))
+                runner.AddFilter(new Core.MigrationFilter.FlagMigrationFilter(new Core.Util.FlagFilter(opts.TrimExpression)));
+
+            if (!string.IsNullOrWhiteSpace(opts.FirstNode))
+                runner.AddFilter(new Core.MigrationFilter.FirstNodeMigrationFilter(opts.FirstNode));
+
+            if (!string.IsNullOrWhiteSpace(opts.LastNode))
+                runner.AddFilter(new Core.MigrationFilter.LastNodeMigrationFilter(opts.LastNode));
+
+            runner.Migrate();
+        }
+
+        private static void SetupMigrateRunner(Core.MigrationRunner runner)
+        {
+            runner.SetOnMigrationError((ctx) =>
+            {
+                output.Info("Migration error!"); Console.WriteLine(ctx.Exception); ctx.Decision = Core.OnMigrationErrorDecision.Stop;
+            });
+            runner.SetOnCompletingTransaction((ctx) =>
+            {
+                ctx.Decision = ctx.HasErrors ? Core.OnCompletingTransactionDecision.Rollback : Core.OnCompletingTransactionDecision.Commit;
+            });
+        }
+
+        private static void SetupTestRunner(Core.MigrationRunner runner)
+        {
+            runner.SetOnMigrationError((ctx) =>
+            {
+                output.Info("Migration error!");
+                Console.WriteLine(ctx.Exception);
+                ctx.Decision = Core.OnMigrationErrorDecision.Stop;
+            });
+            runner.SetOnCompletingTransaction((ctx) =>
+            {
+                ctx.Decision = Core.OnCompletingTransactionDecision.Rollback;
+            });
         }
 
         private static TEnum? TryReadEnum<TEnum>() where TEnum:struct
@@ -89,70 +191,74 @@ namespace DbMigrator.ConsoleApp
             }
         }
 
-        private static void SetupDynamicRunner(Core.MigrationRunner runner, int dynamicLevel)
+        private static void SetupDynamicRunner(Core.MigrationRunner runner)
         {
-            if (dynamicLevel > 0)
+            
+            runner.SetOnCompletingTransaction((context) =>
             {
-                runner.SetOnCompletingTransaction((context) =>
+                output.Info("You are about to complete the migration process. What would you like to do?");
+                DbMigrator.Core.OnCompletingTransactionDecision? decision = null;
+                while (decision == null)
                 {
-                    output.Info("You are about to complete the migration process. What would you like to do?");
-                    DbMigrator.Core.OnCompletingTransactionDecision? decision = null;
-                    while (decision == null)
-                    {
-                        decision = TryReadEnum<DbMigrator.Core.OnCompletingTransactionDecision>();
-                    }
-                    context.Decision = decision.Value;
-                });
-            }
-            if (dynamicLevel > 1)
+                    decision = TryReadEnum<DbMigrator.Core.OnCompletingTransactionDecision>();
+                }
+                context.Decision = decision.Value;
+            });
+            
+            runner.SetOnMigrating((context) =>
             {
-                runner.SetOnMigrating((context) =>
-                {
-                    output.Info(string.Format("Current Migration: {0}", context.Migration.Identifier));
+                output.Info(string.Format("Current Migration: {0}", context.Migration.Identifier));
 
-                    DbMigrator.Core.OnMigratingDecision? decision = null;
-                    while (decision == null)
-                    {
-                        decision = TryReadEnum<DbMigrator.Core.OnMigratingDecision>();
-                    }
-                    context.Decision = decision.Value;
-                });
-
-                runner.SetOnMigrationError((context) =>
+                DbMigrator.Core.OnMigratingDecision? decision = null;
+                while (decision == null)
                 {
-                    output.Info("An error has ocurred. What would you like to do?");
-                    DbMigrator.Core.OnMigrationErrorDecision? decision = null;
-                    while (decision == null)
-                    {
-                        decision = TryReadEnum<DbMigrator.Core.OnMigrationErrorDecision>();
-                    }
-                    context.Decision = decision.Value;
-                });
-            }
+                    decision = TryReadEnum<DbMigrator.Core.OnMigratingDecision>();
+                }
+                context.Decision = decision.Value;
+            });
+
+            runner.SetOnMigrationError((context) =>
+            {
+                output.Info(context.Exception.ToString());
+                output.Info("An error has ocurred. What would you like to do?");
+                DbMigrator.Core.OnMigrationErrorDecision? decision = null;
+                while (decision == null)
+                {
+                    decision = TryReadEnum<DbMigrator.Core.OnMigrationErrorDecision>();
+                }
+                context.Decision = decision.Value;
+            });
+            
         }
     }
 
     public class Options
     {
-        [Option("mode", Required = false, HelpText = "Migrate or Test.", DefaultValue="test")]
+        [VerbOption("migrate")]
+        public MigrateOptions MigrateOptions { get; set; }
+
+        [VerbOption("trim")]
+        public MigrateOptions TrimItems { get; set; }
+    }
+
+    public class MigrateOptions
+    {
+        [Option("mode", Required = false, HelpText = "Migrate, Test or Interactive.", DefaultValue="test")]
         public string Mode { get; set; }
 
-        [Option("interactive", Required = false, DefaultValue=0, HelpText = "If the console should ask questions during the process. 0=Never, 1=CommitTransactionOnly, 2=EveryStep")]
-        public int Interactive { get; set; }
-
-        [Option("identifier", Required = true, HelpText = "The migration runner identifier.")]
+        [Option("identifier", Required = false, HelpText = "The migration runner identifier. Set only if you want to override the map (JSON file) identifier.")]
         public string Identifier { get; set; }
 
         [Option("verbose", Required=false, DefaultValue=false, HelpText = "Print details during execution.")]
         public bool Verbose { get; set; }
 
-        [Option("scriptsMapPath", Required = true, HelpText = "Path to the migration map path.")]
+        [Option("scriptsMapPath", Required = true, HelpText = "Path to the migration map path (JSON file).")]
         public string ScriptsMapPath { get; set; }
 
-        [Option("scriptsRootPath", Required = true, HelpText = "Path to the migration root path (where all sql files are contained).")]
+        [Option("scriptsRootPath", Required = false, HelpText = "Path to the migration root path (where all sql files are contained). The default value is the folder that contains the migration map (JSON).")]
         public string ScriptsRootPath { get; set; }
 
-        [Option("connectionString", Required = true, HelpText = "The database (that will be migrated) connection string.")]
+        [Option("connectionString", Required = true, HelpText = "The database connection string.")]
         public string ConnectionString { get; set; }
 
         [Option("trimExpression", Required = false, DefaultValue = "", HelpText = "An expression to trim the migrations files.")]
@@ -163,6 +269,21 @@ namespace DbMigrator.ConsoleApp
 
         [Option("lastNode", Required = false, DefaultValue = "", HelpText = "The last node to consider in the map. All next nodes will be ignored.")]
         public string FirstNode { get; set; }
+
+        [HelpVerbOption]
+        public string GetUsage()
+        {
+            return CommandLine.Text.HelpText.AutoBuild(this);
+        }
+    }
+
+    public class TrimOptions
+    {
+        [Option("folder", Required = false, HelpText = "Root folder.")]
+        public string Folder { get; set; }
+
+        [Option("filter", Required = true, HelpText = "The expression to filter files.")]
+        public string Filter { get; set; }
 
         [HelpVerbOption]
         public string GetUsage()

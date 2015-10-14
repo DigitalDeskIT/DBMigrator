@@ -349,6 +349,7 @@ WHERE [Key] = @Key;
                     list.Add(item);
                 }
                 reader.Close();
+                connection.Close();
             }
 
 
