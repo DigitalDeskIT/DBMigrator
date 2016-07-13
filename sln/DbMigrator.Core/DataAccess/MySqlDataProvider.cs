@@ -193,7 +193,7 @@ LIMIT 1;", connection);
                 new MySqlParameter("database", connection.Database) { MySqlDbType = MySqlDbType.VarChar, Size = 100 });
                 try
                 {
-                    var result = (int)command.ExecuteScalar() == 1;
+                    var result = (Int64)command.ExecuteScalar() == 1;
                     connection.Close();
                     return result;
                 }
@@ -225,7 +225,7 @@ LIMIT 1;", connection);
 
         private Entities.Data GetDataRecord(string key)
         {
-            MySqlCommand command = new MySqlCommand("SELECT * FROM DbM_Data WHERE Key = @Key LIMIT 1");
+            MySqlCommand command = new MySqlCommand("SELECT * FROM DbM_Data WHERE `Key` = @Key LIMIT 1");
 
             command.Parameters.Add(
                 new MySqlParameter("Key", key) { MySqlDbType = MySqlDbType.VarChar, Size = 100 });
@@ -283,8 +283,8 @@ LIMIT 1;", connection);
         private MySqlCommand GetDataInsertQueryCommand(Entities.Data data)
         {
             string query = @"INSERT INTO DbM_Data
-    (Key 
-    ,Value)
+    (`Key` 
+    ,`Value`)
 VALUES
     (@Key
     ,@Value);
@@ -299,8 +299,8 @@ VALUES
         private MySqlCommand GetDataUpdateByKeyQueryCommand(Entities.Data data)
         {
             string query = @"UPDATE DbM_Data SET
-    Value = @Value
-WHERE Key = @Key;
+    `Value` = @Value
+WHERE `Key` = @Key;
 ";
             MySqlCommand command = new MySqlCommand(query);
             command.Parameters.Add(new MySqlParameter("Key", data.Key) { MySqlDbType = MySqlDbType.VarChar, Size = 50 });
@@ -418,7 +418,7 @@ WHERE Key = @Key;
             int version = 0;
             if (DataTableExist())
             {
-                version = Int32.Parse(GetData("SchemaVersion"));
+                Int32.TryParse(GetData("SchemaVersion"), out version);
             }
 
             var query = "";
@@ -426,21 +426,21 @@ WHERE Key = @Key;
             {
                 query += @"
 CREATE TABLE DbM_Data(
-	Id int(11) NOT NULL AUTO_INCREMENT,
-	Key varchar(MAX) NOT NULL,
-	Value varchar(255) NULL,
- PRIMARY KEY (Id)
-)
+	`Id` int(11) NOT NULL AUTO_INCREMENT,
+	`Key` varchar(21844) NOT NULL,
+	`Value` varchar(255) NULL,
+    PRIMARY KEY (`Id`)
+);
 
 CREATE TABLE DbM_ExecutedMigration(
-	Id int(11) NOT NULL AUTO_INCREMENT,
-	MigrationRunnerId varchar(80) NOT NULL,
-    MigrationNodeId varchar(100) NOT NULL,
-	MigrationId varchar(150) NOT NULL,
-	LastRunDate datetime NOT NULL,
-	LastRunScript varchar(max) NOT NULL
- PRIMARY KEY (Id)
-)";
+	`Id` int(11) NOT NULL AUTO_INCREMENT,
+	`MigrationRunnerId` varchar(80) NOT NULL,
+    `MigrationNodeId` varchar(100) NOT NULL,
+	`MigrationId` varchar(150) NOT NULL,
+	`LastRunDate` datetime NOT NULL,
+	`LastRunScript` varchar(21844) NOT NULL,
+	PRIMARY KEY (`Id`)
+);";
                 version++;
             }
 

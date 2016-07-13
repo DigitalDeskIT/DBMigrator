@@ -42,25 +42,25 @@ namespace DbMigrator.ConsoleApp
 
                     if (invokedVerb == "migrate")
                     {
-                        if (invokedVerbInstance == null)
+                        if (options.MigrateOptions == null)
                         {
                             Console.WriteLine(new MigrateOptions().GetUsage());
                         }
                         else
                         {
-                            Migrate((MigrateOptions)invokedVerbInstance);
+                            Migrate(options.MigrateOptions);
                             return 0;
                         }
                     }
                     else if (invokedVerb == "trim")
                     {
-                        if (invokedVerbInstance == null)
+                        if (options.TrimOptions == null)
                         {
                             Console.WriteLine(new TrimOptions().GetUsage());
                         }
                         else
                         {
-                            Trim((TrimOptions)invokedVerbInstance);
+                            Trim(options.TrimOptions);
                             return 0;
                         }
                     }
@@ -251,7 +251,7 @@ namespace DbMigrator.ConsoleApp
         public MigrateOptions MigrateOptions { get; set; }
 
         [VerbOption("trim")]
-        public MigrateOptions TrimItems { get; set; }
+        public TrimOptions TrimOptions { get; set; }
     }
 
     public class MigrateOptions
