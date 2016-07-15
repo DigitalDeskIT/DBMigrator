@@ -1,0 +1,8 @@
+﻿{
+	"Identifier": "DbMigrator.Test",
+	"Versions":[
+		{ "Name":"0.1.0", "Root":"true", "Migrations":[
+			{ "Description":"Criar o schema básico.", "File":"v0.1.0\\core\\schema.sql", "HelpEmail":"test@test.com" }
+		]}
+	]
+}
