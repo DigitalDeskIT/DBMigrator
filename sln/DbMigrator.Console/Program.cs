@@ -238,7 +238,7 @@ namespace DbMigrator.ConsoleApp
         public MigrateOptions MigrateOptions { get; set; }
 
         [VerbOption("trim")]
-        public MigrateOptions TrimItems { get; set; }
+        public TrimOptions TrimOptions { get; set; }
     }
 
     public class MigrateOptions
