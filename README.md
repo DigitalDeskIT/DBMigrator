@@ -8,3 +8,4 @@ Database versioning tool
 
 ## Suported Databases
 * MSSqlServer
+* MySql
