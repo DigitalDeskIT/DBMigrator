@@ -1,5 +1,5 @@
 <values>
 	<migratorName>DbMigrate_Test</migratorName>
-	<scriptsPath>:\Projetos\DBMigrator\sln\DbMigrator.Core.Test\scripts</scriptsPath>
+	<scriptsPath>:\Projetos\DBMigrator\sln\DbMigrator.Core.Test\MSSQL\scripts</scriptsPath>
 	<userFile>UserData.txt</userFile>
 </values>

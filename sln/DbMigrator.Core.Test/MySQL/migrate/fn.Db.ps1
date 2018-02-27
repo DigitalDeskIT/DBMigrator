@@ -36,6 +36,8 @@ function DBCreate{
 	if ( -not $name){
 		$sufix = Read-Host ('Sufixo do Banco ' + $global:migratorName)
 		$name = $global:migratorName +$sufix
+		$global:DB_Name = $name
+		$global:DB_NiceName=('Local '+$global:DB_Server+' '+$global:DB_Name);
 		Write-Host ''
 	}
 	Write-Host ('Criando novo banco '+$name+'...')
@@ -92,7 +94,11 @@ function mysqlcmd {
 	param($connectionstring,$query)
 	
 	Try {
-		[void][System.Reflection.Assembly]::LoadWithPartialName('MySql.Data')
+		#[void][System.Reflection.Assembly]::LoadWithPartialName('MySql.Data') #if you have installed the MySQL .NET Connector
+		$currentPath = Get-Location;
+		$fileName = 'MySQL.Data.dll'
+		$mysqlddlpath = "$currentPath\$fileName"
+		[void][system.reflection.Assembly]::LoadFrom($mysqlddlpath) #if you have only the MySQL.Data.dll in current directory
 		$Connection = New-Object MySql.Data.MySqlClient.MySqlConnection
 		$Connection.ConnectionString = $connectionstring
 		$Connection.Open()
