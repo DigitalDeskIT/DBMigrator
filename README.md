@@ -8,3 +8,8 @@ Database versioning tool
 
 ## Suported Databases
 * MSSqlServer
+* MySql
+
+## Samples
+* [MSSqlServer](/sln/DbMigrator.Core.Test/MSSQL)
+* [MySql](/sln/DbMigrator.Core.Test/MySQL)

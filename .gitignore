@@ -7,3 +7,5 @@ sln/DbMigrator.Core.Test/obj
 *.suo
 *.user
 sln/packages
+/sln/DbMigrator.Core.Test/MySQL/migrate/LastRun-interactive.txt
+/sln/DbMigrator.Core.Test/MySQL/migrate/UserData.txt

@@ -42,25 +42,25 @@ namespace DbMigrator.ConsoleApp
 
                     if (invokedVerb == "migrate")
                     {
-                        if (invokedVerbInstance == null)
+                        if (options.MigrateOptions == null)
                         {
                             Console.WriteLine(new MigrateOptions().GetUsage());
                         }
                         else
                         {
-                            Migrate((MigrateOptions)invokedVerbInstance);
+                            Migrate(options.MigrateOptions);
                             return 0;
                         }
                     }
                     else if (invokedVerb == "trim")
                     {
-                        if (invokedVerbInstance == null)
+                        if (options.TrimOptions == null)
                         {
                             Console.WriteLine(new TrimOptions().GetUsage());
                         }
                         else
                         {
-                            Trim((TrimOptions)invokedVerbInstance);
+                            Trim(options.TrimOptions);
                             return 0;
                         }
                     }
@@ -90,7 +90,20 @@ namespace DbMigrator.ConsoleApp
 
         private static void Migrate(MigrateOptions opts)
         {
-            var dataProvider = new Core.DataAccess.MSSqlDataProvider(opts.ConnectionString);
+            Core.DataAccess.IDataProvider dataProvider = null;
+
+            switch(opts.Provider.ToLower())
+            {
+                case "mssql":
+                    dataProvider = new Core.DataAccess.MSSqlDataProvider(opts.ConnectionString);
+                    break;
+                case "mysql":
+                    dataProvider = new Core.DataAccess.MySqlDataProvider(opts.ConnectionString);
+                    break;
+                default:
+                    throw new ArgumentException("Invalid provider. Only mssql and mysql are currently supported.");
+            }
+            
 
             if (string.IsNullOrWhiteSpace(opts.ScriptsRootPath))
                 opts.ScriptsRootPath = new FileInfo(opts.ScriptsMapPath).Directory.ToString();
@@ -257,6 +270,9 @@ namespace DbMigrator.ConsoleApp
 
         [Option("scriptsRootPath", Required = false, HelpText = "Path to the migration root path (where all sql files are contained). The default value is the folder that contains the migration map (JSON).")]
         public string ScriptsRootPath { get; set; }
+
+        [Option("provider", Required = false, DefaultValue = "mssql", HelpText = "The database provider (MSSql or MySql).")]
+        public string Provider { get; set; }
 
         [Option("connectionString", Required = true, HelpText = "The database connection string.")]
         public string ConnectionString { get; set; }
