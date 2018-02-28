@@ -59,6 +59,7 @@ Opções:
 	elseif ($option -imatch '^(N|6)$'){
 		Write-Host 'Novo Banco'
 		DBCreate
+		SaveUserData $userDataKeys
 	}
 	elseif ($option -imatch '^(I|7)$'){
 		Write-Host 'Alterar Instância'

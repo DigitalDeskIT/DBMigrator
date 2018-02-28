@@ -46,7 +46,7 @@ function DBCreate{
 	Write-Host '' $dropQuery
 	$result = mysqlcmd $global:DB_ConnectionStringServer $dropQuery 
 	Write-Host '' $result
-	
+	$global:DB_ConnectionString = $global:DB_ConnectionStringServer + ';database='+$global:DB_Name
 }
 
 function DBSetup {
@@ -57,8 +57,9 @@ function DBSetup {
 	$Password = Read-Host 'Password'
 	$Database = Read-Host 'Database'
 	$MySqlHost = Read-Host 'Host'
-	$ConnectionString = 'server=' + $MySqlHost + ';port=3306;uid=' + $User + ';pwd=' + $Password + ';database='+$Database
 	$ConnectionStringServer = 'server=' + $MySqlHost + ';port=3306;uid=' + $User + ';pwd=' + $Password
+	$ConnectionString = $ConnectionStringServer + ';database='+$Database
+	
 	
 	$opts = @{
 		'DB_NiceName'=('Local '+$MySqlHost+' '+$Database);
@@ -68,7 +69,6 @@ function DBSetup {
 		'DB_Name'=$Database
 	}
 	
-	$global:DB_ConnectionString = $ConnectionString
 	$global:DB_NiceName=('Local '+$MySqlHost+' '+$Database);
 	$global:DB_ConnectionString=$ConnectionString;
 	$global:DB_ConnectionStringServer=$ConnectionStringServer;
