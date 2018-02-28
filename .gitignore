@@ -9,3 +9,4 @@ sln/DbMigrator.Core.Test/obj
 sln/packages
 /sln/DbMigrator.Core.Test/MySQL/migrate/LastRun-interactive.txt
 /sln/DbMigrator.Core.Test/MySQL/migrate/UserData.txt
+/sln/DbMigrator.Core.Test/MySQL/migrate/LastRun-migrate.txt
